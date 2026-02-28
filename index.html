@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RL2 Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --surface: #ffffff;
+    --surface2: #f2efeb;
+    --border: #e4ddd6;
+    --accent: #2a2420;
+    --accent-hover: #4a3f38;
+    --tag-bg: #ede8e3;
+    --tag-text: #6b5c52;
+    --danger: #c0392b;
+    --success: #2e7d52;
+    --warning: #b45309;
+    --text: #1a1614;
+    --muted: #9a8f88;
+    --font-serif: 'Instrument Serif', serif;
+    --font-body: 'Instrument Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: var(--font-serif); font-size: 1.4rem; color: var(--text); }
+  .logo em { font-style: italic; color: var(--muted); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.74rem; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 5px 10px; border-radius: 20px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; transition: background 0.3s; flex-shrink: 0; }
+  .status-dot.connected { background: var(--success); }
+  .status-dot.loading { background: var(--warning); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .btn-settings {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    width: 34px; height: 34px; border-radius: 7px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .btn-settings:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-settings svg { width: 15px; height: 15px; }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 560px; margin: 0 auto;
+    padding: 60px 24px 40px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+
+  .hero-label {
+    font-family: var(--font-serif); font-style: italic;
+    font-size: 1.8rem; color: var(--text);
+    text-align: center; margin-bottom: 6px;
+  }
+  .hero-sub {
+    font-size: 0.83rem; color: var(--muted);
+    text-align: center; margin-bottom: 36px;
+  }
+
+  /* ── SEARCH ── */
+  .search-section { width: 100%; position: relative; margin-bottom: 16px; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 0;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(42,36,32,0.08);
+  }
+  .search-icon-wrap {
+    padding: 0 14px; color: var(--muted); flex-shrink: 0;
+    display: flex; align-items: center;
+  }
+  .search-icon-wrap svg { width: 16px; height: 16px; }
+
+  #search-input {
+    flex: 1; border: none; outline: none; background: transparent;
+    font-family: var(--font-body); font-size: 0.95rem; color: var(--text);
+    padding: 14px 0;
+  }
+  #search-input::placeholder { color: var(--muted); }
+
+  .search-clear {
+    padding: 0 14px; color: var(--muted); cursor: pointer;
+    background: none; border: none; font-size: 1rem;
+    display: none; align-items: center;
+  }
+  .search-clear.show { display: flex; }
+  .search-clear:hover { color: var(--text); }
+
+  /* ── SEARCH RESULTS DROPDOWN ── */
+  #search-results {
+    position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    z-index: 50; overflow: hidden; display: none;
+  }
+  #search-results.open { display: block; }
+
+  .result-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--border); transition: background 0.1s;
+    gap: 12px;
+  }
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: var(--surface2); }
+
+  .result-left { flex: 1; min-width: 0; }
+  .result-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .result-meta { font-size: 0.74rem; color: var(--muted); margin-top: 2px; font-family: var(--font-mono); }
+
+  .result-right { text-align: right; flex-shrink: 0; }
+  .result-qty { font-family: var(--font-mono); font-size: 0.88rem; font-weight: 600; }
+  .result-unit { font-size: 0.7rem; color: var(--muted); margin-top: 1px; font-family: var(--font-mono); }
+  .qty-high { color: var(--success); }
+  .qty-med  { color: var(--warning); }
+  .qty-low  { color: var(--danger); }
+
+  .result-tag {
+    font-size: 0.65rem; font-weight: 600; color: var(--tag-text);
+    background: var(--tag-bg); padding: 2px 6px; border-radius: 3px;
+    text-transform: uppercase; letter-spacing: 0.04em; display: inline-block;
+    margin-right: 6px; vertical-align: middle;
+  }
+
+  .no-results {
+    padding: 20px 16px; text-align: center;
+    font-size: 0.85rem; color: var(--muted);
+  }
+
+  /* ── SCAN BUTTON ── */
+  .scan-btn {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--accent); color: #fff; border: none;
+    padding: 14px; border-radius: 10px;
+    font-family: var(--font-body); font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .scan-btn:hover { background: var(--accent-hover); }
+  .scan-btn svg { width: 18px; height: 18px; }
+
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; margin: 14px 0;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── CONFIG MODAL ── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,10,8,0.35);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px;
+    width: 100%; max-width: 460px;
+    transform: translateY(16px); transition: transform 0.2s;
+    position: relative; box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-close {
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: none; color: var(--muted);
+    font-size: 1.1rem; cursor: pointer; padding: 4px 6px;
+    border-radius: 4px; transition: background 0.15s, color 0.15s; line-height:1;
+  }
+  .modal-close:hover { background: var(--surface2); color: var(--text); }
+
+  .modal-title { font-family: var(--font-serif); font-size: 1.4rem; font-style: italic; margin-bottom: 4px; }
+  .modal-subtitle { font-size: 0.8rem; color: var(--muted); margin-bottom: 20px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 13px; border-radius: 7px;
+    font-size: 0.85rem; font-family: var(--font-mono); outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field .hint { font-size: 0.73rem; color: var(--muted); margin-top: 5px; }
+
+  .btn-primary {
+    width: 100%; background: var(--accent); color: #fff; border: none;
+    padding: 12px; border-radius: 8px; font-family: var(--font-body);
+    font-size: 0.88rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s; margin-top: 4px;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── SCANNER MODAL ── */
+  #scanner-container {
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); background: #111; position: relative;
+  }
+  #qr-reader { width: 100%; }
+  .scanner-frame {
+    position: absolute; inset: 0; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scanner-box {
+    width: 190px; height: 190px;
+    border: 2px solid rgba(255,255,255,0.7);
+    border-radius: 6px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+    position: relative;
+  }
+  .scanner-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: #fff; opacity: 0.9;
+    animation: scanline 1.8s ease-in-out infinite;
+  }
+  @keyframes scanline { 0%,100%{top:0} 50%{top:calc(100% - 2px)} }
+  .corner { position: absolute; width: 14px; height: 14px; border-color: #fff; border-style: solid; }
+  .corner.tl { top:-2px; left:-2px; border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .corner.tr { top:-2px; right:-2px; border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .corner.bl { bottom:-2px; left:-2px; border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .corner.br { bottom:-2px; right:-2px; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+
+  .scan-status { text-align: center; margin-top: 12px; font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono); min-height: 18px; }
+  .scan-status.found { color: var(--success); font-weight: 600; }
+  .scan-status.error { color: var(--danger); }
+
+  .manual-toggle { text-align: center; margin-top: 14px; }
+  .manual-toggle button {
+    background: none; border: none; color: var(--muted);
+    font-size: 0.78rem; cursor: pointer; text-decoration: underline;
+    font-family: var(--font-body); transition: color 0.15s;
+  }
+  .manual-toggle button:hover { color: var(--text); }
+  .manual-row { display: none; gap: 8px; margin-top: 12px; }
+  .manual-row.show { display: flex; }
+  .manual-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 7px;
+    font-family: var(--font-mono); font-size: 0.88rem; outline: none;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .manual-input:focus { border-color: var(--accent); }
+  .btn-go {
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 16px; border-radius: 7px;
+    font-family: var(--font-body); font-weight: 600; font-size: 0.82rem;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-go:hover { background: var(--accent-hover); }
+
+  /* ── ISSUE MODAL ── */
+  .item-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 18px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+  }
+  .item-card-left .ic-label,
+  .item-card-right .ic-label { font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .item-card-left .ic-name { font-size: 0.95rem; font-weight: 600; margin-top: 3px; }
+  .item-card-left .ic-meta { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+  .item-card-right { text-align: right; flex-shrink: 0; }
+  .item-card-right .ic-qty { font-family: var(--font-mono); font-size: 1rem; font-weight: 700; color: var(--text); margin-top: 3px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(70px);
+    background: var(--text); color: #fff;
+    padding: 11px 22px; border-radius: 7px;
+    font-size: 0.84rem; font-weight: 500;
+    transition: transform 0.25s, opacity 0.25s;
+    opacity: 0; z-index: 400; white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast.success { background: var(--success); }
+  #toast.error   { background: var(--danger); }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 540px) {
+    main { padding: 40px 16px 32px; }
+    header { padding: 12px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RL2 <em>Inventory</em></div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Not connected</span>
+    </div>
+    <button class="btn-settings" onclick="openModal('config-modal')" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="hero-label">Issue Material</div>
+  <div class="hero-sub">Search by item name or code, or scan a QR code</div>
+
+  <!-- SEARCH -->
+  <div class="search-section">
+    <div class="search-box">
+      <div class="search-icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <input type="text" id="search-input" placeholder="Item name or code…" autocomplete="off" oninput="onSearchInput()" onkeydown="onSearchKey(event)" />
+      <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+    <div id="search-results"></div>
+  </div>
+
+  <div class="divider">or</div>
+
+  <!-- SCAN -->
+  <button class="scan-btn" onclick="openScanner()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+      <rect x="7" y="7" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="14" y="7" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="14" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
+    </svg>
+    Scan QR Code
+  </button>
+</main>
+
+<!-- ── CONFIG MODAL ── -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('config-modal')">✕</button>
+    <div class="modal-title">Settings</div>
+    <div class="modal-subtitle">Connect the app to your Google Sheet</div>
+    <div class="field">
+      <label>Apps Script Web App URL</label>
+      <input type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/…/exec" />
+      <div class="hint">Deploy your Code.gs as a Web App and paste the URL here</div>
+    </div>
+    <button class="btn-primary" onclick="saveConfig()">Save & Connect</button>
+  </div>
+</div>
+
+<!-- ── SCANNER MODAL ── -->
+<div class="modal-overlay" id="scanner-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('scanner-modal')">✕</button>
+    <div class="modal-title">Scan QR Code</div>
+    <div class="modal-subtitle">Point camera at the item's QR code</div>
+    <div id="scanner-container">
+      <div id="qr-reader"></div>
+      <div class="scanner-frame">
+        <div class="scanner-box">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scan-status" id="scan-status">Point camera at QR code…</div>
+    <div class="manual-toggle">
+      <button onclick="toggleManual()">Can't scan? Enter code manually</button>
+    </div>
+    <div class="manual-row" id="manual-row">
+      <input class="manual-input" id="manual-code" type="text" placeholder="e.g. MAT-001"
+             onkeydown="if(event.key==='Enter') lookupManual()" />
+      <button class="btn-go" onclick="lookupManual()">Go</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ISSUE MODAL ── -->
+<div class="modal-overlay" id="issue-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('issue-modal')">✕</button>
+    <div class="modal-title">Issue Material</div>
+    <div class="modal-subtitle">Deduct quantity from stock</div>
+    <div class="item-card">
+      <div class="item-card-left">
+        <div class="ic-label">Item</div>
+        <div class="ic-name" id="modal-item-name">—</div>
+        <div class="ic-meta" id="modal-item-meta">—</div>
+      </div>
+      <div class="item-card-right">
+        <div class="ic-label">In Stock</div>
+        <div class="ic-qty" id="modal-avail">—</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Quantity to Issue</label>
+      <input type="number" id="issue-qty" min="0.01" step="0.01" placeholder="0.00" />
+      <div class="hint" id="modal-unit-hint"></div>
+    </div>
+    <div class="field">
+      <label>Issued To <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input type="text" id="issue-to" placeholder="Employee name or department" />
+    </div>
+    <button class="btn-primary" id="submit-btn" onclick="submitIssue()">Confirm Issue</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────
+let SCRIPT_URL = localStorage.getItem('ls_script_url') || '';
+let allItems   = [];
+let activeItemIndex = null;
+let html5QrCode = null;
+let scannerRunning = false;
+
+// ── INIT ───────────────────────────────────────────────────────
+(function init() {
+  if (SCRIPT_URL) {
+    document.getElementById('script-url-input').value = SCRIPT_URL;
+    setStatus('loading');
+    loadInventory();
+  } else {
+    setStatus('off');
+  }
+})();
+
+function setStatus(state) {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = 'status-dot';
+  if (state === 'connected') {
+    dot.classList.add('connected');
+    text.textContent = allItems.length + ' items loaded';
+  } else if (state === 'loading') {
+    dot.classList.add('loading');
+    text.textContent = 'Loading…';
+  } else {
+    text.textContent = 'Not connected';
+  }
+}
+
+// ── CONFIG ─────────────────────────────────────────────────────
+function saveConfig() {
+  const val = document.getElementById('script-url-input').value.trim();
+  if (!val.startsWith('https://script.google.com')) {
+    showToast('Please enter a valid Apps Script URL', 'error'); return;
+  }
+  SCRIPT_URL = val;
+  localStorage.setItem('ls_script_url', val);
+  closeModal('config-modal');
+  setStatus('loading');
+  loadInventory();
+}
+
+// ── LOAD INVENTORY ─────────────────────────────────────────────
+async function loadInventory() {
+  try {
+    const res  = await fetch(SCRIPT_URL + '?action=getInventory', { redirect: 'follow' });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allItems = data.items || [];
+    setStatus('connected');
+  } catch(e) {
+    setStatus('off');
+    showToast('Could not load inventory: ' + e.message, 'error');
+  }
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────
+function onSearchInput() {
+  const q = document.getElementById('search-input').value.trim();
+  document.getElementById('search-clear').classList.toggle('show', q.length > 0);
+
+  if (q.length === 0) {
+    closeResults(); return;
+  }
+
+  // If inventory not yet loaded, try loading first
+  if (allItems.length === 0 && SCRIPT_URL) {
+    loadInventory().then(() => showResults(q));
+    return;
+  }
+
+  showResults(q);
+}
+
+function showResults(q) {
+  const ql = q.toLowerCase();
+  const matches = allItems.filter(i =>
+    i.name.toLowerCase().includes(ql) ||
+    i.code.toLowerCase().includes(ql) ||
+    i.category.toLowerCase().includes(ql)
+  ).slice(0, 8); // max 8 results
+
+  const box = document.getElementById('search-results');
+  box.classList.add('open');
+
+  if (matches.length === 0) {
+    box.innerHTML = `<div class="no-results">No items found for "<strong>${esc(q)}</strong>"</div>`;
+    return;
+  }
+
+  box.innerHTML = matches.map(item => {
+    const idx = allItems.indexOf(item);
+    const qty = parseFloat(item.quantity);
+    const qc  = qty <= 0 ? 'qty-low' : qty <= 10 ? 'qty-med' : 'qty-high';
+    const qtyDisplay = Number.isInteger(qty) ? qty : qty.toFixed(2);
+    return `<div class="result-item" onclick="selectResult(${idx})">
+      <div class="result-left">
+        <div class="result-name">
+          <span class="result-tag">${esc(item.category)}</span>${esc(item.name)}
+        </div>
+        <div class="result-meta">${esc(item.code)}</div>
+      </div>
+      <div class="result-right">
+        <div class="result-qty ${qc}">${qtyDisplay}</div>
+        <div class="result-unit">${esc(item.unit)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectResult(idx) {
+  closeResults();
+  clearSearch();
+  openIssueByIndex(idx);
+}
+
+function onSearchKey(e) {
+  if (e.key === 'Escape') { clearSearch(); closeResults(); }
+}
+
+function clearSearch() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').classList.remove('show');
+  closeResults();
+}
+
+function closeResults() {
+  const box = document.getElementById('search-results');
+  box.classList.remove('open');
+  box.innerHTML = '';
+}
+
+// Close results when clicking outside
+document.addEventListener('click', function(e) {
+  const section = document.querySelector('.search-section');
+  if (!section.contains(e.target)) closeResults();
+});
+
+// ── SCANNER ────────────────────────────────────────────────────
+function openScanner() {
+  if (!SCRIPT_URL) { openModal('config-modal'); return; }
+
+  const go = () => {
+    document.getElementById('scan-status').textContent = 'Starting camera…';
+    document.getElementById('scan-status').className = 'scan-status';
+    document.getElementById('manual-row').classList.remove('show');
+    document.getElementById('manual-code').value = '';
+    openModal('scanner-modal');
+
+    if (html5QrCode) { try { html5QrCode.clear(); } catch(e) {} }
+    html5QrCode = new Html5Qrcode("qr-reader");
+    scannerRunning = false;
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 24, qrbox: { width: 220, height: 220 } },
+      function(decodedText) {
+        if (!scannerRunning) return;
+        scannerRunning = false;
+        onScanSuccess(decodedText);
+      },
+      function() {}
+    ).then(function() {
+      scannerRunning = true;
+      document.getElementById('scan-status').textContent = 'Point camera at QR code…';
+    }).catch(function(err) {
+      document.getElementById('scan-status').textContent = 'Camera error — check permissions';
+      document.getElementById('scan-status').className = 'scan-status error';
+    });
+  };
+
+  // Ensure items are loaded before scanning
+  if (allItems.length === 0) {
+    showToast('Loading inventory…', '');
+    loadInventory().then(go);
+  } else {
+    go();
+  }
+}
+
+function onScanSuccess(decodedText) {
+  const code = decodedText.trim().toUpperCase();
+  const idx  = allItems.findIndex(i => i.code.trim().toUpperCase() === code);
+
+  if (idx === -1) {
+    document.getElementById('scan-status').textContent = '⚠ "' + code + '" not found — try again';
+    document.getElementById('scan-status').className = 'scan-status error';
+    setTimeout(function() {
+      if (!scannerRunning) {
+        scannerRunning = true;
+        document.getElementById('scan-status').textContent = 'Point camera at QR code…';
+        document.getElementById('scan-status').className = 'scan-status';
+      }
+    }, 2000);
+    return;
+  }
+
+  document.getElementById('scan-status').textContent = '✓ ' + allItems[idx].name;
+  document.getElementById('scan-status').className = 'scan-status found';
+
+  html5QrCode.stop().then(function() {
+    html5QrCode.clear();
+    scannerRunning = false;
+    document.getElementById('scanner-modal').classList.remove('open');
+    openIssueByIndex(idx);
+  }).catch(function() {
+    document.getElementById('scanner-modal').classList.remove('open');
+    openIssueByIndex(idx);
+  });
+}
+
+function closeScanner() {
+  if (html5QrCode && scannerRunning) {
+    scannerRunning = false;
+    html5QrCode.stop().then(function() { html5QrCode.clear(); }).catch(function() {});
+  }
+  document.getElementById('manual-row').classList.remove('show');
+  document.getElementById('manual-code').value = '';
+}
+
+function toggleManual() {
+  const row = document.getElementById('manual-row');
+  row.classList.toggle('show');
+  if (row.classList.contains('show')) document.getElementById('manual-code').focus();
+}
+
+function lookupManual() {
+  const code = document.getElementById('manual-code').value.trim().toUpperCase();
+  if (!code) return;
+  const idx = allItems.findIndex(i => i.code.trim().toUpperCase() === code);
+  if (idx === -1) {
+    document.getElementById('scan-status').textContent = '⚠ "' + code + '" not found';
+    document.getElementById('scan-status').className = 'scan-status error';
+    return;
+  }
+  document.getElementById('scanner-modal').classList.remove('open');
+  closeScanner();
+  openIssueByIndex(idx);
+}
+
+// ── ISSUE MODAL ────────────────────────────────────────────────
+function openIssueByIndex(idx) {
+  activeItemIndex = idx;
+  const item = allItems[idx];
+  const qty  = parseFloat(item.quantity);
+  const qc   = qty <= 0 ? 'qty-low' : qty <= 10 ? 'qty-med' : 'qty-high';
+
+  document.getElementById('modal-item-name').textContent = item.name;
+  document.getElementById('modal-item-meta').textContent = item.category + ' · ' + item.code;
+  document.getElementById('modal-avail').textContent = (Number.isInteger(qty) ? qty : qty.toFixed(2)) + ' ' + item.unit;
+  document.getElementById('modal-avail').className = 'ic-qty ' + qc;
+  document.getElementById('modal-unit-hint').textContent = 'Enter amount in ' + item.unit;
+  document.getElementById('issue-qty').value = '';
+  document.getElementById('issue-to').value = '';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Confirm Issue';
+  openModal('issue-modal');
+  setTimeout(() => document.getElementById('issue-qty').focus(), 300);
+}
+
+async function submitIssue() {
+  const qty      = parseFloat(document.getElementById('issue-qty').value);
+  const issuedTo = document.getElementById('issue-to').value.trim();
+
+  if (!qty || qty <= 0) { showToast('Enter a valid quantity', 'error'); return; }
+
+  const item = allItems[activeItemIndex];
+  if (qty > parseFloat(item.quantity)) {
+    showToast('Cannot issue more than available: ' + item.quantity + ' ' + item.unit, 'error');
+    return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Processing…';
+
+  try {
+    const params = new URLSearchParams({
+      action:    'issueItem',
+      rowIndex:  item.rowIndex,
+      qty:       qty,
+      issuedTo:  issuedTo,
+      timestamp: new Date().toISOString()
+    });
+    const res  = await fetch(SCRIPT_URL + '?' + params.toString(), { redirect: 'follow' });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Update failed');
+
+    // Update local cache
+    item.quantity = parseFloat(item.quantity) - qty;
+    closeModal('issue-modal');
+    showToast('Issued ' + qty + ' ' + item.unit + ' of ' + item.name, 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Confirm Issue';
+  }
+}
+
+// ── MODAL HELPERS ──────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'scanner-modal' && scannerRunning) closeScanner();
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+});
+
+// ── TOAST ──────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3500);
+}
+
+// ── UTIL ───────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
