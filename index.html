@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RL2 Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --surface: #ffffff;
+    --surface2: #f2efeb;
+    --border: #e4ddd6;
+    --accent: #2a2420;
+    --accent-hover: #4a3f38;
+    --tag-bg: #ede8e3;
+    --tag-text: #6b5c52;
+    --danger: #c0392b;
+    --success: #2e7d52;
+    --warning: #b45309;
+    --text: #1a1614;
+    --muted: #9a8f88;
+    --font-serif: 'Instrument Serif', serif;
+    --font-body: 'Instrument Sans', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    font-size: 15px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 40px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky; top: 0; z-index: 100;
+  }
+
+  .logo { font-family: var(--font-serif); font-size: 1.45rem; color: var(--text); letter-spacing: -0.01em; }
+  .logo em { font-style: italic; color: var(--muted); }
+
+  .scan-trigger-btn {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 16px; border-radius: 7px;
+    font-family: var(--font-body); font-size: 0.83rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s; letter-spacing: 0.01em;
+  }
+  .scan-trigger-btn:hover { background: var(--accent-hover); }
+  .scan-trigger-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  /* MAIN */
+  main { max-width: 1020px; margin: 0 auto; padding: 30px 24px; }
+
+  /* CONFIG */
+  #config-banner {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 28px;
+  }
+  .config-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; margin-top: 5px; transition: background 0.3s; }
+  .status-dot.connected { background: var(--success); }
+  .config-top-text h3 { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text); }
+  .config-top-text p { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  .config-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .config-input {
+    flex: 1; min-width: 220px;
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 7px;
+    font-family: var(--font-mono); font-size: 0.73rem; outline: none;
+  }
+  .config-input:focus { border-color: var(--accent); }
+  .btn-save {
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 16px; border-radius: 7px;
+    font-family: var(--font-body); font-weight: 600; font-size: 0.82rem;
+    cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  }
+  .btn-save:hover { background: var(--accent-hover); }
+
+  /* SECTION */
+  .section-label {
+    font-family: var(--font-serif); font-style: italic;
+    font-size: 1.3rem; color: var(--text); margin-bottom: 12px;
+  }
+
+  /* SEARCH */
+  .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .search-wrap { position: relative; flex: 1; }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  #search-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 12px 10px 38px;
+    border-radius: 8px; font-family: var(--font-body); font-size: 0.9rem; outline: none;
+    transition: border-color 0.15s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--muted); }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-bottom: 40px;
+  }
+  .table-meta {
+    padding: 10px 18px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .table-meta span { font-size: 0.74rem; color: var(--muted); font-family: var(--font-mono); }
+  #refresh-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 5px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 0.74rem; font-family: var(--font-body); transition: all 0.15s;
+  }
+  #refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--surface2); padding: 9px 18px;
+    text-align: left; font-size: 0.67rem; font-weight: 600;
+    letter-spacing: 0.07em; color: var(--muted); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 11px 18px; font-size: 0.875rem; vertical-align: middle; }
+
+  .td-category span {
+    font-size: 0.68rem; font-weight: 600; color: var(--tag-text);
+    background: var(--tag-bg); padding: 3px 7px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.04em; display: inline-block;
+  }
+  .td-code { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+  .td-item { font-weight: 500; }
+  .td-qty { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; }
+  .qty-high { color: var(--success); }
+  .qty-med { color: var(--warning); }
+  .qty-low { color: var(--danger); }
+  .td-unit { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+
+  .btn-issue {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); padding: 5px 13px; border-radius: 6px;
+    cursor: pointer; font-size: 0.78rem; font-family: var(--font-body);
+    font-weight: 500; transition: all 0.15s;
+  }
+  .btn-issue:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .table-message { text-align: center; padding: 50px 20px; color: var(--muted); font-size: 0.875rem; }
+  .spinner {
+    display: inline-block; width: 15px; height: 15px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    margin-right: 8px; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MODALS */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,10,8,0.35);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px;
+    width: 100%; max-width: 420px;
+    transform: translateY(16px); transition: transform 0.2s;
+    position: relative; box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+
+  .modal-close {
+    position: absolute; top: 14px; right: 14px;
+    background: none; border: none; color: var(--muted);
+    font-size: 1.1rem; cursor: pointer; line-height: 1;
+    padding: 4px 6px; border-radius: 4px; transition: background 0.15s, color 0.15s;
+  }
+  .modal-close:hover { background: var(--surface2); color: var(--text); }
+
+  .modal-title { font-family: var(--font-serif); font-size: 1.5rem; font-style: italic; color: var(--text); margin-bottom: 4px; }
+  .modal-subtitle { font-size: 0.8rem; color: var(--muted); margin-bottom: 20px; }
+
+  /* Scanner */
+  #scanner-container {
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); background: #111; position: relative;
+  }
+  #qr-reader { width: 100%; }
+  .scanner-frame {
+    position: absolute; inset: 0; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scanner-box {
+    width: 170px; height: 170px;
+    border: 2px solid rgba(255,255,255,0.8);
+    border-radius: 6px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .scanner-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: #fff;
+    animation: scanline 2s ease-in-out infinite;
+    opacity: 0.9;
+  }
+  @keyframes scanline { 0%,100%{top:0} 50%{top:calc(100% - 2px)} }
+  .corner { position: absolute; width: 14px; height: 14px; border-color: #fff; border-style: solid; }
+  .corner.tl { top:-2px; left:-2px; border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .corner.tr { top:-2px; right:-2px; border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .corner.bl { bottom:-2px; left:-2px; border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .corner.br { bottom:-2px; right:-2px; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+
+  .scan-status { text-align: center; margin-top: 12px; font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono); min-height: 18px; }
+  .scan-status.found { color: var(--success); }
+  .scan-status.error { color: var(--danger); }
+
+  .manual-entry-toggle { text-align: center; margin-top: 14px; }
+  .manual-entry-toggle button {
+    background: none; border: none; color: var(--muted);
+    font-size: 0.78rem; cursor: pointer; text-decoration: underline;
+    font-family: var(--font-body); transition: color 0.15s;
+  }
+  .manual-entry-toggle button:hover { color: var(--text); }
+  .manual-code-row { display: none; gap: 8px; margin-top: 12px; }
+  .manual-code-row.show { display: flex; }
+  .manual-code-input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 12px; border-radius: 7px;
+    font-family: var(--font-mono); font-size: 0.88rem; outline: none;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .manual-code-input:focus { border-color: var(--accent); }
+  .btn-manual-go {
+    background: var(--accent); color: #fff; border: none;
+    padding: 9px 16px; border-radius: 7px;
+    font-family: var(--font-body); font-weight: 600; font-size: 0.82rem;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-manual-go:hover { background: var(--accent-hover); }
+
+  /* Issue modal */
+  .modal-item-card {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 18px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+  .item-card-left .ilabel,
+  .item-card-right .ilabel { font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .item-card-left .iname { font-size: 0.95rem; font-weight: 600; margin-top: 3px; }
+  .item-card-left .icode { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .item-card-right { text-align: right; }
+  .item-card-right .iavail { font-family: var(--font-mono); font-size: 1rem; font-weight: 600; color: var(--text); margin-top: 3px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin-bottom: 7px; }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 10px 13px; border-radius: 7px;
+    font-size: 0.9rem; font-family: var(--font-body); outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field .hint { font-size: 0.73rem; color: var(--muted); margin-top: 5px; }
+
+  .btn-submit {
+    width: 100%; background: var(--accent); color: #fff; border: none;
+    padding: 12px; border-radius: 8px; font-family: var(--font-body);
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s; margin-top: 4px; letter-spacing: 0.02em;
+  }
+  .btn-submit:hover { background: var(--accent-hover); }
+  .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(70px);
+    background: var(--text); color: #fff;
+    padding: 11px 22px; border-radius: 7px;
+    font-size: 0.84rem; font-weight: 500;
+    transition: transform 0.25s, opacity 0.25s;
+    opacity: 0; z-index: 400; white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  #toast.success { background: var(--success); }
+  #toast.error { background: var(--danger); }
+
+  @media (max-width: 600px) {
+    header { padding: 12px 16px; }
+    main { padding: 20px 14px; }
+    td, th { padding: 9px 12px; }
+    .scan-trigger-btn .btn-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">RL2 <em>Inventory</em></div>
+  <button class="scan-trigger-btn" onclick="openScanner()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+      <rect x="7" y="7" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="14" y="7" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="7" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
+      <rect x="14" y="14" width="3" height="3" rx="0.5" fill="currentColor"/>
+    </svg>
+    <span class="btn-label">Scan QR</span>
+  </button>
+</header>
+
+<main>
+
+  <div id="config-banner">
+    <div class="config-top">
+      <div class="status-dot" id="status-dot"></div>
+      <div class="config-top-text">
+        <h3>Google Sheet Connection</h3>
+        <p>Paste your Apps Script Web App URL to connect live inventory</p>
+      </div>
+    </div>
+    <div class="config-row">
+      <input class="config-input" id="script-url-input" type="text" placeholder="https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec" />
+      <button class="btn-save" onclick="saveConfig()">Connect</button>
+    </div>
+  </div>
+
+  <div class="section-label">Inventory</div>
+
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </span>
+      <input type="text" id="search-input" placeholder="Search by category, item name or code…" oninput="filterTable()" />
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-meta">
+      <span id="item-count">— items</span>
+      <button id="refresh-btn" onclick="loadInventory()">↻ Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Item Code</th>
+          <th>Item Name</th>
+          <th>Qty</th>
+          <th>Unit</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="inventory-body">
+        <tr><td colspan="6" class="table-message">Connect your Google Sheet above, then click Refresh</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<!-- SCANNER MODAL -->
+<div class="modal-overlay" id="scanner-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeScanner()">✕</button>
+    <div class="modal-title">Scan QR Code</div>
+    <div class="modal-subtitle">Point camera at the item's QR code</div>
+    <div id="scanner-container">
+      <div id="qr-reader"></div>
+      <div class="scanner-frame">
+        <div class="scanner-box">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+      </div>
+    </div>
+    <div class="scan-status" id="scan-status">Waiting for QR code…</div>
+    <div class="manual-entry-toggle">
+      <button onclick="toggleManual()">Can't scan? Enter item code manually</button>
+    </div>
+    <div class="manual-code-row" id="manual-row">
+      <input class="manual-code-input" id="manual-code" type="text" placeholder="e.g. MAT-001" onkeydown="if(event.key==='Enter')lookupManual()" />
+      <button class="btn-manual-go" onclick="lookupManual()">Go</button>
+    </div>
+  </div>
+</div>
+
+<!-- ISSUE MODAL -->
+<div class="modal-overlay" id="issue-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('issue-modal')">✕</button>
+    <div class="modal-title">Issue Material</div>
+    <div class="modal-subtitle">Deduct quantity from current stock</div>
+    <div class="modal-item-card">
+      <div class="item-card-left">
+        <div class="ilabel">Item</div>
+        <div class="iname" id="modal-item-name">—</div>
+        <div class="icode" id="modal-item-code">—</div>
+      </div>
+      <div class="item-card-right">
+        <div class="ilabel">In Stock</div>
+        <div class="iavail" id="modal-avail">—</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>Quantity to Issue</label>
+      <input type="number" id="issue-qty" min="0.01" step="0.01" placeholder="0.00" />
+      <div class="hint" id="modal-unit-hint">—</div>
+    </div>
+    <div class="field">
+      <label>Issued To <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <input type="text" id="issue-to" placeholder="Employee name or department" />
+    </div>
+    <button class="btn-submit" id="submit-btn" onclick="submitIssue()">Confirm Issue</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let SCRIPT_URL = localStorage.getItem('ls_script_url') || '';
+let allItems = [];
+let activeItemIndex = null;
+let html5QrCode = null;
+let scannerRunning = false;
+
+if (SCRIPT_URL) {
+  document.getElementById('script-url-input').value = SCRIPT_URL;
+  document.getElementById('status-dot').classList.add('connected');
+}
+
+function saveConfig() {
+  const val = document.getElementById('script-url-input').value.trim();
+  if (!val.startsWith('https://script.google.com')) {
+    showToast('Please enter a valid Apps Script URL', 'error'); return;
+  }
+  SCRIPT_URL = val;
+  localStorage.setItem('ls_script_url', val);
+  document.getElementById('status-dot').classList.add('connected');
+  showToast('Connected! Loading inventory…', 'success');
+  loadInventory();
+}
+
+async function loadInventory() {
+  if (!SCRIPT_URL) { showToast('Set your Google Sheet URL first', 'error'); return; }
+  const tbody = document.getElementById('inventory-body');
+  tbody.innerHTML = `<tr><td colspan="6" class="table-message"><span class="spinner"></span>Loading…</td></tr>`;
+  try {
+    const res = await fetch(`${SCRIPT_URL}?action=getInventory`, {redirect: 'follow'});
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allItems = data.items || [];
+    renderTable(allItems);
+    document.getElementById('item-count').textContent = `${allItems.length} items`;
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-message" style="color:var(--danger)">⚠ ${e.message}</td></tr>`;
+    showToast('Load failed: ' + e.message, 'error');
+  }
+}
+
+function renderTable(items) {
+  const tbody = document.getElementById('inventory-body');
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="table-message">No items found</td></tr>`; return;
+  }
+  tbody.innerHTML = items.map(item => {
+    const qty = parseFloat(item.quantity);
+    const qc = qty <= 0 ? 'qty-low' : qty <= 10 ? 'qty-med' : 'qty-high';
+    const idx = allItems.indexOf(item);
+    return `<tr>
+      <td class="td-category"><span>${esc(item.category)}</span></td>
+      <td class="td-code">${esc(item.code)}</td>
+      <td class="td-item">${esc(item.name)}</td>
+      <td class="td-qty ${qc}">${Number.isInteger(qty) ? qty : qty.toFixed(2)}</td>
+      <td class="td-unit">${esc(item.unit)}</td>
+      <td><button class="btn-issue" onclick="openIssueByIndex(${idx})">Issue</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = q
+    ? allItems.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
+    : allItems;
+  renderTable(filtered);
+  document.getElementById('item-count').textContent = `${filtered.length} of ${allItems.length} items`;
+}
+
+function openScanner() {
+  if (!SCRIPT_URL) { showToast('Connect your Google Sheet first', 'error'); return; }
+  openModal('scanner-modal');
+  document.getElementById('scan-status').textContent = 'Starting camera…';
+  document.getElementById('scan-status').className = 'scan-status';
+  html5QrCode = new Html5Qrcode("qr-reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 180, height: 180 } },
+    onScanSuccess,
+    () => {}
+  ).then(() => {
+    scannerRunning = true;
+    document.getElementById('scan-status').textContent = 'Waiting for QR code…';
+  }).catch(err => {
+    document.getElementById('scan-status').textContent = 'Camera error: ' + err;
+    document.getElementById('scan-status').className = 'scan-status error';
+  });
+}
+
+function onScanSuccess(decodedText) {
+  if (!scannerRunning) return;
+  scannerRunning = false; // prevent multiple triggers
+  lookupByCode(decodedText.trim().toUpperCase());
+}
+
+function lookupByCode(code) {
+  const idx = allItems.findIndex(i => i.code.trim().toUpperCase() === code);
+  if (idx === -1) {
+    scannerRunning = true;
+    document.getElementById('scan-status').textContent = `⚠ Code "${code}" not found in inventory`;
+    document.getElementById('scan-status').className = 'scan-status error';
+    return;
+  }
+  document.getElementById('scan-status').textContent = `✓ Found: ${allItems[idx].name}`;
+  document.getElementById('scan-status').className = 'scan-status found';
+  setTimeout(() => {
+    // Stop scanner, populate search box, filter table, open issue modal
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => { html5QrCode.clear(); });
+    }
+    closeModal('scanner-modal');
+    document.getElementById('manual-row').classList.remove('show');
+    document.getElementById('manual-code').value = '';
+    // Feed into search box and filter table
+    const searchBox = document.getElementById('search-input');
+    searchBox.value = allItems[idx].code;
+    filterTable();
+    // Open issue modal directly
+    openIssueByIndex(idx);
+  }, 600);
+}
+
+function closeScanner() {
+  if (html5QrCode && scannerRunning) {
+    html5QrCode.stop().then(() => { html5QrCode.clear(); scannerRunning = false; });
+  }
+  closeModal('scanner-modal');
+  document.getElementById('manual-row').classList.remove('show');
+  document.getElementById('manual-code').value = '';
+}
+
+function toggleManual() {
+  document.getElementById('manual-row').classList.toggle('show');
+  if (document.getElementById('manual-row').classList.contains('show'))
+    document.getElementById('manual-code').focus();
+}
+
+function lookupManual() {
+  const code = document.getElementById('manual-code').value.trim().toUpperCase();
+  if (code) lookupByCode(code);
+}
+
+function openIssueByIndex(index) {
+  activeItemIndex = index;
+  const item = allItems[index];
+  document.getElementById('modal-item-name').textContent = item.name;
+  document.getElementById('modal-item-code').textContent = `${item.category} · ${item.code}`;
+  document.getElementById('modal-avail').textContent = `${item.quantity} ${item.unit}`;
+  document.getElementById('modal-unit-hint').textContent = `Enter amount in ${item.unit}`;
+  document.getElementById('issue-qty').value = '';
+  document.getElementById('issue-to').value = '';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = 'Confirm Issue';
+  openModal('issue-modal');
+}
+
+async function submitIssue() {
+  const qty = parseFloat(document.getElementById('issue-qty').value);
+  const issuedTo = document.getElementById('issue-to').value.trim();
+  if (!qty || qty <= 0) { showToast('Enter a valid quantity', 'error'); return; }
+  const item = allItems[activeItemIndex];
+  if (qty > parseFloat(item.quantity)) { showToast('Cannot issue more than available stock!', 'error'); return; }
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('submit-btn').textContent = 'Processing…';
+  try {
+    const params = new URLSearchParams({
+      action: 'issueItem',
+      rowIndex: item.rowIndex,
+      qty: qty,
+      issuedTo: issuedTo,
+      timestamp: new Date().toISOString()
+    });
+    const res = await fetch(SCRIPT_URL + '?' + params.toString(), {redirect: 'follow'});
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Update failed');
+    item.quantity = parseFloat(item.quantity) - qty;
+    renderTable(allItems);
+    closeModal('issue-modal');
+    showToast(`Issued ${qty} ${item.unit} — ${item.name}`, 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+    document.getElementById('submit-btn').disabled = false;
+    document.getElementById('submit-btn').textContent = 'Confirm Issue';
+  }
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'scanner-modal') closeScanner();
+}
+
+let toastTimer;
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 3200);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+});
+
+if (SCRIPT_URL) loadInventory();
+</script>
+</body>
+</html>
